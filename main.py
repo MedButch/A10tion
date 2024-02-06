@@ -24,7 +24,7 @@ class Hand:
     def __init__(self, cards) -> None:
         self.cards = cards
 
-    def stringify_hand(self):
+    def stringify(self):
         string = ""
         for card in self.cards:
             string += f"{card.stringify()} "
@@ -35,29 +35,49 @@ class Hand:
             if card.compare(played):
                 self.cards.remove(card)
                 return
-            
-    def score(self):
-        sum = 0
-        for card in self.cards:
-            sum += card.score
-        return sum
     
     def playable(self, trump, trick):
         playable = []
-        required_suit = trick[0][0] if trick else None
+        required_suit = trick[0].suit if trick else None
         for card in self.cards:
             if card.suit == required_suit or card.suit == trump:
                 playable.append(card)
         if not playable:
             playable = [card for card in self.cards]
         return playable
+    
+class Trick:
+    def __init__(self) -> None:
+        self.played = []
+
+    def stringify(self):
+        string = ""
+        for card in self.played:
+            string += f"{card.stringify()} "
+        return string
+    
+    def getCards(self):
+        return self.played
+
+    def add(self, card):
+        self.played.append(card)
+
+    def empty(self):
+        self.played = []
+               
+    def score(self):
+        sum = 0
+        for card in self.played:
+            sum += card.points
+        return sum
+
 
 
 hand = None
 turn = 0
 player = ""
 teammate = 0
-trick = []
+trick = Trick()
 played = []
 bids = [0, 0, 0, 0]
 bidWinner = 0
@@ -76,7 +96,7 @@ while (line := input().split())[0] != "end":
         case "hand":
             new_game = True
             hand = Hand([Card(card) for card in line[1:]])
-            print(f"hand: {hand.stringify_hand()}\n", file=sys.stderr)
+            print(f"hand: {hand.stringify()}\n", file=sys.stderr)
 
         case "bid":
             if line[1] == "?":
@@ -89,24 +109,24 @@ while (line := input().split())[0] != "end":
 
         case "card":
             if line[1] == "?":
-                playable = hand.playable(trump, trick)
+                playable = hand.playable(trump, trick.getCards())
                 # print(f"{playable[0].stringify()}", file=sys.stderr)
                 playable_hand = Hand(playable)
                 # print(f"{playable_hand.cards[0].stringify()}")
-                print(f"playable: {playable_hand.stringify_hand()}", file=sys.stderr)
+                print(f"playable: {playable_hand.stringify()}", file=sys.stderr)
                 print(0)
             else:
                 turn = (turn + 1) % 4
                 card = line[2]
-                trick.append(card)
-                print(f"trick: {trick}\n", file=sys.stderr)
+                trick.add(Card(card))
+                print(f"trick: {trick.stringify()}\n", file=sys.stderr)
                 if new_game:
                     trump = line[2][0]
                 if not turn: #turn == 0
-                    # print(f"Trick score: {Hand(trick).score()}")
-                    played.extend(trick)
-                    trick = []
+                    print(f"Trick score: {trick.score()}", file=sys.stderr)
+                    played.extend(trick.getCards())
+                    trick.empty()
                 if line[1] == player:
                     hand.remove(card)
-                    print(f"hand: {hand.stringify_hand()}\n", file=sys.stderr)
+                    print(f"hand: {hand.stringify()}\n", file=sys.stderr)
     
