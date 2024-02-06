@@ -17,8 +17,16 @@ class Card:
     def stringify(self):
         return f"{self.suit}{self.value}"
     
-    def compare(self, card):
+    def equals(self, card):
         return card == self.stringify()
+    
+    def compare(self, card):
+        order = "56789TJQKA"
+        self_rank = order.index(self.value)
+        card_rank = order.index(card.value)
+        print(f"self {self.value} {self_rank} card {card.value} {card_rank}", file=sys.stderr)
+        return self_rank > card_rank
+
 
 class Hand:
     def __init__(self, cards) -> None:
@@ -32,15 +40,14 @@ class Hand:
 
     def remove(self, played):
         for card in self.cards:
-            if card.compare(played):
+            if card.equals(played):
                 self.cards.remove(card)
                 return
     
     def playable(self, trump, trick):
         playable = []
-        required_suit = trick[0].suit if trick else None
         for card in self.cards:
-            if card.suit == required_suit or card.suit == trump:
+            if card.suit == trick.required or card.suit == trump:
                 playable.append(card)
         if not playable:
             playable = [card for card in self.cards]
@@ -48,41 +55,71 @@ class Hand:
     
 class Trick:
     def __init__(self) -> None:
-        self.played = []
+        self.played = {}
+        self.required = None
 
     def stringify(self):
         string = ""
-        for card in self.played:
-            string += f"{card.stringify()} "
+        for player in self.played:
+            string += f"{self.played[player].stringify()} "
         return string
     
     def getCards(self):
-        return self.played
+        return [self.played[player] for player in self.played]
 
-    def add(self, card):
-        self.played.append(card)
+    def add(self, player, card):
+        if not self.played:
+            self.required = card.suit
+        self.played[player] = card
 
     def empty(self):
-        self.played = []
+        self.played.clear()
+        self.required = None
                
     def score(self):
         sum = 0
-        for card in self.played:
-            sum += card.points
+        for player in self.played:
+            sum += self.played[player].points
         return sum
 
-
+    def winner(self, trump):
+        players = list(self.played)
+        print(trump, file=sys.stderr)
+        print(self.played, file=sys.stderr)
+        print(players, file=sys.stderr)
+        id = players[0]
+        top = self.played[id]
+        for player in players[1:]:
+            card = self.played[player]
+            if card.suit == trump:
+                if top.suit == trump:
+                    if not top.compare(card):
+                        top = card
+                        id = player
+                else:
+                    top = card
+                    id = player
+            elif card.suit == self.required:
+                if not top.compare(card):
+                    top = card
+                    id = player
+        return id
+        
+        
 
 hand = None
 turn = 0
 player = ""
 teammate = 0
+team = 0
 trick = Trick()
 played = []
 bids = [0, 0, 0, 0]
 bidWinner = 0
 trump = None
 new_game = False
+game_points = [0, 0]
+points = [0, 0]
 
 while (line := input().split())[0] != "end":
     # print(line, file=sys.stderr)
@@ -109,7 +146,7 @@ while (line := input().split())[0] != "end":
 
         case "card":
             if line[1] == "?":
-                playable = hand.playable(trump, trick.getCards())
+                playable = hand.playable(trump, trick)
                 # print(f"{playable[0].stringify()}", file=sys.stderr)
                 playable_hand = Hand(playable)
                 # print(f"{playable_hand.cards[0].stringify()}")
@@ -118,12 +155,14 @@ while (line := input().split())[0] != "end":
             else:
                 turn = (turn + 1) % 4
                 card = line[2]
-                trick.add(Card(card))
-                print(f"trick: {trick.stringify()}\n", file=sys.stderr)
+                trick.add(int(line[1]), Card(card))
+                print(f"trick: {trick.stringify()} winner: {trick.winner(trump)}\n", file=sys.stderr)
                 if new_game:
                     trump = line[2][0]
+                    new_game = False
                 if not turn: #turn == 0
-                    print(f"Trick score: {trick.score()}", file=sys.stderr)
+                    game_points[trick.winner(trump)%2] += trick.score()
+                    print(f"Trick score: {trick.score()} Trick winner: {trick.winner(trump)} Winning team: {trick.winner(trump)%2} Game score: {game_points}", file=sys.stderr)
                     played.extend(trick.getCards())
                     trick.empty()
                 if line[1] == player:
